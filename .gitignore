@@ -1,0 +1,8 @@
+**/__pycache__/
+**/01_model_logs/**
+**.wav
+**/.txt
+**/.DS_Store
+**/.venv
+
+.DS_Store

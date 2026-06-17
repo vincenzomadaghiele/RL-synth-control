@@ -8,48 +8,48 @@ import joblib
 
 from stable_baselines3 import A2C, PPO, TD3, SAC
 import gymnasium as gym
-from environment import SynthGenEnv
+from environment import SynthGenEnv, computeFeatures
 
 from synthesizers import *
 
 
-def computeFeaturesCorpus(signal, features4training, sample_rate, FFT_window_size, hop_size):
+# def computeFeaturesCorpus(signal, features4training, sample_rate, FFT_window_size, hop_size):
 
-    features = []
-    mfcc_N = 13
-    chroma_N = 12
-    if 'rms' in features4training:
-        rms = librosa.feature.rms(y=signal, frame_length=FFT_window_size, hop_length=hop_size)
-        features.append(rms)
-    if 'pitch' in features4training:
-        pitch = librosa.yin(signal, fmin=100, fmax=22000, sr=sample_rate, frame_length=FFT_window_size, hop_length=hop_size)
-        features.append(pitch.reshape(1,-1))
-    if 'cent' in features4training:
-        cent = librosa.feature.spectral_centroid(y=signal, sr=sample_rate, n_fft=FFT_window_size, hop_length=hop_size)
-        features.append(cent)
-    if 'flatness' in features4training:
-        flatness = librosa.feature.spectral_flatness(y=signal, n_fft=FFT_window_size, hop_length=hop_size)
-        features.append(flatness)
-    if 'rolloff' in features4training:
-        rolloff = librosa.feature.spectral_rolloff(y=signal, sr=sample_rate, n_fft=FFT_window_size, hop_length=hop_size)
-        features.append(rolloff)
-    if 'MFCC' in features4training:
-        mfcc = librosa.feature.mfcc(y=signal, sr=sample_rate, n_mfcc=mfcc_N, n_fft=FFT_window_size, hop_length=hop_size)
-        for mfcc_component in mfcc.tolist():
-            features.append(np.array(mfcc_component).reshape(1,-1))
-    if 'chroma' in features4training:
-        chroma = librosa.feature.chroma_stft(y=signal, sr=sample_rate, n_chroma=chroma_N, n_fft=FFT_window_size, hop_length=hop_size)
-        for chroma_component in chroma.tolist():
-            features.append(np.array(chroma_component).reshape(1,-1))
-    features = np.concatenate(features, axis=0)
-    return features
+#     features = []
+#     mfcc_N = 13
+#     chroma_N = 12
+#     if 'rms' in features4training:
+#         rms = librosa.feature.rms(y=signal, frame_length=FFT_window_size, hop_length=hop_size)
+#         features.append(rms)
+#     if 'pitch' in features4training:
+#         pitch = librosa.yin(signal, fmin=100, fmax=22000, sr=sample_rate, frame_length=FFT_window_size, hop_length=hop_size)
+#         features.append(pitch.reshape(1,-1))
+#     if 'cent' in features4training:
+#         cent = librosa.feature.spectral_centroid(y=signal, sr=sample_rate, n_fft=FFT_window_size, hop_length=hop_size)
+#         features.append(cent)
+#     if 'flatness' in features4training:
+#         flatness = librosa.feature.spectral_flatness(y=signal, n_fft=FFT_window_size, hop_length=hop_size)
+#         features.append(flatness)
+#     if 'rolloff' in features4training:
+#         rolloff = librosa.feature.spectral_rolloff(y=signal, sr=sample_rate, n_fft=FFT_window_size, hop_length=hop_size)
+#         features.append(rolloff)
+#     if 'MFCC' in features4training:
+#         mfcc = librosa.feature.mfcc(y=signal, sr=sample_rate, n_mfcc=mfcc_N, n_fft=FFT_window_size, hop_length=hop_size)
+#         for mfcc_component in mfcc.tolist():
+#             features.append(np.array(mfcc_component).reshape(1,-1))
+#     if 'chroma' in features4training:
+#         chroma = librosa.feature.chroma_stft(y=signal, sr=sample_rate, n_chroma=chroma_N, n_fft=FFT_window_size, hop_length=hop_size)
+#         for chroma_component in chroma.tolist():
+#             features.append(np.array(chroma_component).reshape(1,-1))
+#     features = np.concatenate(features, axis=0)
+#     return features
 
 
 if __name__ == "__main__":
 
 	# load model
-	MODEL_NAME = '2025-12-04/1764862455-TD3'
-	log_dir = f'RL_continuous/00_model_logs/{MODEL_NAME}'
+	MODEL_NAME = '2026-04-23/1776934426-SAC'
+	log_dir = f'corpus-target/01_model_logs/{MODEL_NAME}'
 
 	with open(f'{log_dir}/training_config.json', 'r') as f:
 		training_parameters = json.load(f)
@@ -60,23 +60,24 @@ if __name__ == "__main__":
 
 	config = AudioGraphConfig()
 	config.sample_rate = sr
-	config.output_buffer_size = 512
-	config.output_device_name = "UltraLite-mk5"
+	config.output_buffer_size = 256
+	# config.output_device_name = "UltraLite-mk5"
+	config.output_device_name = "BlackHole 16ch"
 	config.input_device_name = "UltraLite-mk5"
 	graph = AudioGraph(config)
 	# graph.poll(2)
-	audio_in = AudioIn() * 3
-	right_output = StereoPanner(audio_in, 1)
+	audio_in = AudioIn() * 1
+	# right_output = StereoPanner(audio_in, 1)
 
-	if training_parameters["synth_type"] == 'Benjolin':
+	if training_parameters["src_synth_type"] == 'Benjolin':
 		synth = Benjolin()
-	elif training_parameters["synth_type"] == 'FM':
+	elif training_parameters["src_synth_type"] == 'FM':
 		synth = FM()
-	elif training_parameters["synth_type"] == 'Granulator':
+	elif training_parameters["src_synth_type"] == 'Granular':
 		synth = Granular()
 	else:
 		synth = Theremin()
-
+	synth.play()
 
 	N_params = len(synth.inputs)
 	synth_parameters = np.zeros(N_params).tolist()
@@ -87,26 +88,32 @@ if __name__ == "__main__":
 		synth.set_input(param_name, synth_parameters[i]) 
 
 	# graph.play([synth, audio_in]) 
-	graph.play([audio_in, synth]) 
+	# graph.play([audio_in, synth]) 
+	# graph.play(StereoPanner(audio_in, 1)) 
+	# graph.play(StereoPanner(synth, -1)) 
+	
 
-
-	corpus_scaler = joblib.load(f'{log_dir}/corpus_scaler.pkl')
-	synth_scaler = joblib.load(f'{log_dir}/synth_scaler.pkl')
+	corpus_scaler = joblib.load(f'{log_dir}/tgt_synth_scaler.pkl')
+	synth_scaler = joblib.load(f'{log_dir}/src_synth_scaler.pkl')
 
 	# create env
 	# define environment
 	env = gym.make(
 		training_parameters["environment"],
-		corpus_path=training_parameters["corpus_csv_path"],
 		features=training_parameters["features"],
-		synth_type=training_parameters["synth_type"],
+		src_synth_type=training_parameters["src_synth_type"],
+		corpus_path = training_parameters["corpus_path"],
 		sample_rate = training_parameters["sample_rate"],
 		FFT_window_size = training_parameters["FFT_window_size"],
 		hop_size = training_parameters["hop_size"],
+		N_steps_memory=training_parameters["N_steps_memory"],
+		N_reward_memory=training_parameters["N_reward_memory"],
 		max_episode_duration=training_parameters["max_episode_duration"],
-		param_in_state=training_parameters["param_in_state"],
-		feature_difference=training_parameters["feature_difference"],
-		synths_info_dir='RL_continuous/01_synthesizers',
+		step_size=training_parameters["step_size"],
+		rewards = training_parameters["rewards"],
+		normalization_mode = training_parameters["normalization_mode"],
+		episode_mode = training_parameters["episode_mode"],
+		synths_info_dir='RL_continuous/corpus-domain/01_synthesizers',
 		save_folder=log_dir,
 		train=False,
 		render_mode=None
@@ -126,44 +133,56 @@ if __name__ == "__main__":
 		model = SAC.load(MODEL_DIR, env=env)
 
 
-	synth_buffer = Buffer(1, window_size)
-	input_buffer = Buffer(1, window_size)
+	synth_buffer = Buffer(1, window_size*3)
+	input_buffer = Buffer(1, window_size*3)
 
 	# add delay lines for responses (how to compensate for latency?)
 	min_feedback_writer_delay = graph.output_buffer_size / graph.sample_rate # samples
 	graph.add_node(FeedbackBufferWriter(synth_buffer, synth, min_feedback_writer_delay))
 	graph.add_node(FeedbackBufferWriter(input_buffer, audio_in, min_feedback_writer_delay))
 
+	fade_time = hop_size / sr / 8
 
 	update_interval_s = hop_size / sr
 	input_sound = input_buffer.data[0,:]
+	synth_sound = synth_buffer.data[0,:]
 	# make environment for live
-	prev_audioin_features = computeFeaturesCorpus(input_sound, training_parameters["features"], sr, window_size, hop_size)
-	prev_audioin_features = corpus_scaler.transform(np.array(prev_audioin_features)[:,-1].reshape(1, -1))
+	# prev_audioin_features = computeFeaturesCorpus(input_sound, training_parameters["features"], sr, window_size, hop_size)
+	prev_audioin_features = computeFeatures(input_sound, training_parameters["features"], sr, window_size, hop_size)
+	prev_audioin_features = corpus_scaler.transform(np.array(prev_audioin_features))
+	previous_src_features = computeFeatures(synth_sound, training_parameters["features"], sr, window_size, hop_size)
+	prev_audioin_features = synth_scaler.transform(np.array(previous_src_features))
 	time.sleep(update_interval_s)
+
+	# graph.play([audio_in, synth]) 
+	graph.play([0,0,audio_in]) 
+	# audio_in.play()
+	# graph.play(StereoPanner(audio_in, 1)) 
+	# StereoPanner(synth, -1).play()
+	# graph.play(StereoPanner(synth, -1)) 
+	# StereoPanner(synth, -1).play()
+	# StereoPanner(audio_in, -1).play()
+
 	while True:
 		input_sound = input_buffer.data[0,:]
-		audioin_features = computeFeaturesCorpus(input_sound, training_parameters["features"], sr, window_size, hop_size)
-		audioin_features = corpus_scaler.transform(np.array(audioin_features)[:,-1].reshape(1, -1))
+		synth_sound = synth_buffer.data[0,:]
+		# audioin_features = computeFeaturesCorpus(input_sound, training_parameters["features"], sr, window_size, hop_size)
+		audioin_features = computeFeatures(input_sound, training_parameters["features"], sr, window_size, hop_size)
+		audioin_features = corpus_scaler.transform(np.array(audioin_features))
+		previous_src_features = computeFeatures(synth_sound, training_parameters["features"], sr, window_size, hop_size)
+		previous_src_features = synth_scaler.transform(np.array(previous_src_features))
 
-		if training_parameters["param_in_state"]:
-			if training_parameters["feature_difference"]:
-				observation = np.concatenate((np.array(audioin_features).reshape(-1) - np.array(prev_audioin_features).reshape(-1),
-											np.array(synth_parameters).reshape(-1))).astype(np.float32)
-			else:
-				observation = np.concatenate((np.array(audioin_features).reshape(-1), 
-											np.array(prev_audioin_features).reshape(-1),
-											np.array(synth_parameters).reshape(-1))).astype(np.float32)
-		else:
-			if training_parameters["feature_difference"]:
-				observation = (np.array(audioin_features).reshape(-1) - np.array(prev_audioin_features).reshape(-1)).astype(np.float32)
-			else:
-				observation = np.concatenate((np.array(audioin_features).reshape(-1), 
-											np.array(prev_audioin_features).reshape(-1))).astype(np.float32)
+		# update observed state
+		observation = np.concatenate((np.array(audioin_features)[-2,:].reshape(-1), 
+									np.array(prev_audioin_features)[-2,:].reshape(-1), 
+									np.array(previous_src_features)[-2,:].reshape(-1),
+									# np.array([0,0,0,0]).reshape(-1),
+									np.array(synth_parameters).reshape(-1)))
 
 
 		action, _ = model.predict(observation=observation, deterministic=True)
 		# print(audioin_features)
+		# # print(np.array(previous_src_features)[-2,:].reshape(-1))
 		# print(action)
 		synth_parameters += action
 		synth_parameters = np.clip(synth_parameters, a_min=0, a_max=1)
@@ -171,14 +190,19 @@ if __name__ == "__main__":
 		# update synth parameters
 		# synth_parameters = np.random.rand(N_params).tolist()
 		print('-' * 20)
+		# for i, param_name in enumerate(list(synth.inputs.keys())):
+		# 	print(f'{param_name}: {synth.inputs[param_name].value:.3f}')
+		# 	# current_p = synth.inputs[param_name].value
+		# 	# p_fade = Line(current_p, synth_parameters[i], synth.fade_time)
+		# 	synth.set_input(param_name, synth_parameters[i]) 
+
 		for i, param_name in enumerate(list(synth.inputs.keys())):
 			print(f'{param_name}: {synth.inputs[param_name].value:.3f}')
-			# current_p = synth.inputs[param_name].value
-			# p_fade = Line(current_p, synth_parameters[i], synth.fade_time)
-			synth.set_input(param_name, synth_parameters[i]) 
+			current_p = synth.inputs[param_name].value
+			p_fade = Line(current_p, synth_parameters[i], fade_time)
+			synth.set_input(param_name, p_fade) 
+
 
 		prev_audioin_features = audioin_features
 		time.sleep(update_interval_s)
-
-
 

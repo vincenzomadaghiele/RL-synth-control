@@ -10,9 +10,9 @@ import soundfile as sf
 import pandas as pd
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import matplotlib.pyplot as plt
+from sklearn.metrics.pairwise import cosine_similarity
 
 import torch
-# import torch.nn as nn
 import torch.nn.functional as F
 
 import gymnasium as gym
@@ -163,7 +163,7 @@ class SynthGenEnv(gym.Env):
 		self,
 		features: list,
 		src_synth_type='Theremin',
-		corpus_path='./00_corpus/00_moisesdb/bass',
+		corpus_path='./00_corpus/moisesdb_guitar',
 		sample_rate=44100,
 		FFT_window_size=2048,
 		hop_size=512,
@@ -175,15 +175,12 @@ class SynthGenEnv(gym.Env):
 		target_type = 'synth', # synth OR corpus
 		normalization_mode = 'source',
 		episode_mode = 'static',
-		synths_info_dir='01_synthesizers',
+		synths_info_dir='02_synthesizers',
 		save_folder='00_model_logs',
 		seed=None,
 		train=True,
 		render_mode=None
 	):
-		## TODO:
-		# - AUTOMATE TARGET PARAMETER CHANGE
-		# - AUDIO TRACK INPUT
 
 		## GLOBAL ENV PARAMETERS
 		self.src_synth_type = src_synth_type
@@ -271,11 +268,13 @@ class SynthGenEnv(gym.Env):
 			if normalization_mode == 'source':
 				synth_feats_df_src = synth_feats_df_src[self.feature_names]
 				synth_samples_features = synth_feats_df_src.values
-				self.src_synth_scaler = StandardScaler()
+				# self.src_synth_scaler = StandardScaler()
+				self.src_synth_scaler = MinMaxScaler()
 				self.src_synth_scaler.fit(np.array(synth_samples_features))
 				self.tgt_synth_scaler = self.src_synth_scaler
 			elif normalization_mode == 'target':
-				self.tgt_synth_scaler = StandardScaler()
+				# self.tgt_synth_scaler = StandardScaler()
+				self.tgt_synth_scaler = MinMaxScaler()
 				corpus_features = corpus_df[self.feature_names].values
 				self.tgt_synth_scaler.fit(corpus_features)
 				self.src_synth_scaler = self.tgt_synth_scaler
@@ -284,15 +283,18 @@ class SynthGenEnv(gym.Env):
 				synth_src_features = synth_feats_df_src.values
 				synth_tgt_features = corpus_df[self.feature_names].values
 				synth_samples_features = np.concatenate((synth_src_features, synth_tgt_features), axis=0)
-				self.src_synth_scaler = StandardScaler()
+				# self.src_synth_scaler = StandardScaler()
+				self.src_synth_scaler = MinMaxScaler()
 				self.src_synth_scaler.fit(np.array(synth_samples_features))
 				self.tgt_synth_scaler = self.src_synth_scaler
 			elif normalization_mode == 'separate':
 				synth_feats_df_src = synth_feats_df_src[self.feature_names]
 				synth_samples_features = synth_feats_df_src.values
-				self.src_synth_scaler = StandardScaler()
+				# self.src_synth_scaler = StandardScaler()
+				self.src_synth_scaler = MinMaxScaler()
 				self.src_synth_scaler.fit(np.array(synth_samples_features))
-				self.tgt_synth_scaler = StandardScaler()
+				# self.tgt_synth_scaler = StandardScaler()
+				self.tgt_synth_scaler = MinMaxScaler()
 				corpus_features = corpus_df[self.feature_names].values
 				self.tgt_synth_scaler.fit(corpus_features)
 			joblib.dump(self.src_synth_scaler, f'{self.save_folder}/src_synth_scaler.pkl')
@@ -301,11 +303,11 @@ class SynthGenEnv(gym.Env):
 		else:
 			# MOVE THESE TO JSON
 			if src_synth_type == 'Benjolin':
-				self.N_src_synth_parameters = 4
+				self.N_src_synth_parameters = 8
 			elif src_synth_type == 'Granular':
 				self.N_src_synth_parameters = 4
 			elif src_synth_type == 'FM':
-				self.N_src_synth_parameters = 8
+				self.N_src_synth_parameters = 4
 			else:
 				self.N_src_synth_parameters = 2
 			self.N_tgt_synth_parameters = 2
@@ -335,8 +337,9 @@ class SynthGenEnv(gym.Env):
 		self.previous_synth_features = np.zeros((self.N_features,))
 		self.synthesis_parameters = np.zeros((self.N_src_synth_parameters,))
 		self.src_synthesis_parameters = np.zeros((self.N_src_synth_parameters,))
-		self.max_episode_duration = max([int(sig.shape[0]/self.hop_size) for sig in self.signals])
-		print(f'max episode duration: {self.max_episode_duration}')
+		if self.train:
+			self.max_episode_duration = max([int(sig.shape[0]/self.hop_size) for sig in self.signals])
+			print(f'max episode duration: {self.max_episode_duration}')
 
 		self.N_steps_memory = N_steps_memory
 		self.N_reward_memory = N_reward_memory
@@ -360,6 +363,11 @@ class SynthGenEnv(gym.Env):
 			self.mrSTFT_values = []
 			self.dMSE_values = []
 			self.diffMSE_values = []
+			self.specMAE_values = []
+			self.specConv_values = []
+			self.mfccMAE_values = []
+			self.mfccMAE40_values = []
+			self.SOT_values = []
 
 
 	def reset(self, seed=None, options=None):
@@ -412,7 +420,7 @@ class SynthGenEnv(gym.Env):
 												FFT_window_size=self.FFT_window_size, hop_size=self.hop_size, 
 												mfcc_N=self.mfcc_N, chroma_N=self.chroma_N)#.mean(axis=0)
 		# self.previous_src_features = self.tgt_synth_scaler.transform(previous_src_features)[-self.N_steps_memory:,:].mean(axis=0).reshape(-1)
-		self.previous_src_features = self.tgt_synth_scaler.transform(previous_src_features)#[-1,:].reshape(-1)
+		self.previous_src_features = self.src_synth_scaler.transform(previous_src_features)#[-1,:].reshape(-1)
 		self.this_episode_influence = tgt_synth_sound
 
 		# CONSTRUCT OBSERVATION
@@ -487,6 +495,16 @@ class SynthGenEnv(gym.Env):
 			self.episode_evaluation['dMSE_std'] = np.array(self.dMSE_values).std()
 			self.episode_evaluation['diffMSE_mean'] = np.array(self.diffMSE_values).mean()
 			self.episode_evaluation['diffMSE_std'] = np.array(self.diffMSE_values).std()
+			self.episode_evaluation['specMAE_mean'] = np.array(self.specMAE_values).mean()
+			self.episode_evaluation['specMAE_std'] = np.array(self.specMAE_values).std()
+			self.episode_evaluation['specConv_mean'] = np.array(self.specConv_values).mean()
+			self.episode_evaluation['specConv_std'] = np.array(self.specConv_values).std()
+			self.episode_evaluation['mfccMAE_mean'] = np.array(self.mfccMAE_values).mean()
+			self.episode_evaluation['mfccMAE_std'] = np.array(self.mfccMAE_values).std()
+			self.episode_evaluation['mfccMAE40_mean'] = np.array(self.mfccMAE40_values).mean()
+			self.episode_evaluation['mfccMAE40_std'] = np.array(self.mfccMAE40_values).std()
+			self.episode_evaluation['SOT_mean'] = np.array(self.SOT_values).mean()
+			self.episode_evaluation['SOT_std'] = np.array(self.SOT_values).std()
 			with open(f'{curr_savedir}/evaluation.json', 'w', encoding='utf-8') as f:
 				json.dump(self.episode_evaluation, f, ensure_ascii=False, indent=4)
 
@@ -494,11 +512,17 @@ class SynthGenEnv(gym.Env):
 			self.mrSTFT_values = []
 			self.dMSE_values = []
 			self.diffMSE_values = []
+			self.specMAE_values = []
+			self.specConv_values = []
+			self.mfccMAE_values = []
+			self.mfccMAE40_values = []
+			self.SOT_values = []
 
 			self.render()
 		return np.array(obs.tolist(), dtype=np.float32), info
 
 	def step(self, action):
+		prev_params = self.src_synthesis_parameters
 		# perform action --> get f(g(theta_pre + theta_mod))
 		self.src_synthesis_parameters += action
 		self.src_synthesis_parameters = np.clip(self.src_synthesis_parameters, a_min=0, a_max=1)
@@ -529,16 +553,30 @@ class SynthGenEnv(gym.Env):
 		if 'mrSTFT' in self.rewards:
 			# reward += self.mrSTFTReward(self.memory_tgt[-(self.N_reward_memory+1)*self.hop_size:-self.hop_size], self.memory_src[-self.N_reward_memory*self.hop_size:])
 			reward += self.mrSTFTReward(self.memory_tgt[-2*self.hop_size:-self.hop_size], self.memory_src[-self.hop_size:])
-		elif 'featureDifference' in self.rewards:
+		if 'featureDifference' in self.rewards:
 			reward += self.featureDifferenceReward(self.previous_tgt_features[-2,:], src_features[-2,:])
 			# reward += self.featureDifferenceReward(self.previous_tgt_features[1:-1,:][-self.N_reward_memory:,:], src_features[1:-1,:][-self.N_reward_memory:,:])
 			# reward /= 2
-		elif 'featureDistance' in self.rewards:
+		if 'featureDistance' in self.rewards:
 			# reward += self.featureDirectionReward(tgt_features[-(self.N_reward_memory+1):-1,:], src_features[-self.N_reward_memory:,:])
 			reward += self.featureDirectionReward(self.previous_tgt_features[-2,:], src_features[-2,:])
-		elif 'RMSdifference' in self.rewards:
+		if 'RMSdifference' in self.rewards:
 			# reward += self.RMSDifferenceReward(tgt_features[-(self.N_reward_memory+1):-1,:], src_features[-self.N_reward_memory:,:])
 			reward += self.RMSDifferenceReward(self.previous_tgt_features[-2,:], src_features[-2,:])
+		if 'spectrogramMAE' in self.rewards:
+			reward += - self.spectrogramMAE(self.memory_tgt[-2*self.hop_size:-self.hop_size], self.memory_src[-self.hop_size:])
+		if 'spectralConvergence' in self.rewards:
+			reward += - self.spectralConvergence(self.memory_tgt[-2*self.hop_size:-self.hop_size], self.memory_src[-self.hop_size:])
+		if 'MFCC_MAE' in self.rewards:
+			reward += - self.MFCC_MAE(self.memory_tgt[-2*self.hop_size:-self.hop_size], self.memory_src[-self.hop_size:])
+		if 'parameters_MAE' in self.rewards:
+			reward += - self.parameters_MAE(prev_params, self.src_synthesis_parameters, weight=0.3)
+		if 'cosineDifference' in self.rewards:
+			reward += self.cosineDifferenceReward(self.previous_tgt_features[-2,:], src_features[-2,:])
+		if 'cosineDistance' in self.rewards:
+			reward += self.cosineDistanceReward(self.previous_tgt_features[-4:-2,:], src_features[-4:-2,:])
+		if 'SpectralOptimalTransport' in self.rewards:
+			reward += self.SpectralOptimalTransport(self.memory_tgt[-2*self.hop_size:-self.hop_size], self.memory_src[-self.hop_size:])
 		reward /= len(self.rewards)
 		
 		self.cumulative_reward += reward
@@ -547,6 +585,11 @@ class SynthGenEnv(gym.Env):
 			self.mrSTFT_values.append(self.mrSTFTReward(self.memory_tgt[-2*self.hop_size:-self.hop_size], self.memory_src[-self.hop_size:]))
 			self.dMSE_values.append(self.featureDifferenceReward(self.previous_tgt_features[-2,:], src_features[-2,:]))
 			self.diffMSE_values.append(self.featureDirectionReward(self.previous_tgt_features[-2,:], src_features[-2,:]))
+			self.specMAE_values.append(self.spectrogramMAE(self.memory_tgt[-2*self.hop_size:-self.hop_size], self.memory_src[-self.hop_size:]))
+			self.specConv_values.append(self.spectralConvergence(self.memory_tgt[-2*self.hop_size:-self.hop_size], self.memory_src[-self.hop_size:]))
+			self.mfccMAE_values.append(self.MFCC_MAE(self.memory_tgt[-2*self.hop_size:-self.hop_size], self.memory_src[-self.hop_size:], N_BANDS=13))
+			self.mfccMAE40_values.append(self.MFCC_MAE(self.memory_tgt[-2*self.hop_size:-self.hop_size], self.memory_src[-self.hop_size:], N_BANDS=40))
+			# self.SOT_values.append(self.SpectralOptimalTransport(self.memory_tgt[-2*self.hop_size:-self.hop_size], self.memory_src[-self.hop_size:]))
 
 		info = {}
 		info["episode_step"] = self.episode_step
@@ -559,7 +602,7 @@ class SynthGenEnv(gym.Env):
 		info["previous_target_features"] = [float(f"{p:.2f}") for p in self.previous_tgt_features[-2,:].reshape(-1).tolist()]
 		info["reward"] = reward
 		if self.episode_step % 50 == 0:
-			print(f"Step {self.episode_step} | Reward {reward:.3f} | Action {info["action"]} | Parameters {info["src_synthesis_parameters"]} ")
+			# print(f"Step {self.episode_step} | Reward {reward:.3f} | Action {info["action"]} | Parameters {info["src_synthesis_parameters"]} ")
 			print(f'TGT feats {info["previous_target_features"]} | SRC feats {info["src_synth_features"]} | NEW TGT feats {info["tgt_synth_features"]}')
 
 		# extract new target from corpus
@@ -575,6 +618,7 @@ class SynthGenEnv(gym.Env):
 							self.src_synthesis_parameters))
 
 		if self.render_mode == "human":
+			# audio export
 			self.src_synth_audiotrack[self.episode_step*self.hop_size:(self.episode_step+1)*self.hop_size] = synth_sound_src[-self.hop_size:]
 			self.tgt_synth_audiotrack[self.episode_step*self.hop_size:(self.episode_step+1)*self.hop_size] = synth_sound_tgt[-self.hop_size:]
 			self.episode_src_features_list.append(src_features[-2,:])
@@ -626,6 +670,41 @@ class SynthGenEnv(gym.Env):
 			logmag_loss = F.l1_loss(torch.log(mag_true + 1e-7), torch.log(mag_pred + 1e-7))
 			loss += sc_loss + logmag_loss
 		return max(-loss.detach().item(),-1000) # to avoid infinity in backprop
+	def spectrogramMAE(self, y_true, y_pred):
+		min_len = min(y_true.shape[0], y_pred.shape[0])
+		y_true_STFT = librosa.stft(y_true[:min_len], n_fft=self.hop_size, hop_length=int(self.hop_size/2))
+		y_pred_STFT = librosa.stft(y_pred[:min_len], n_fft=self.hop_size, hop_length=int(self.hop_size/2))
+		spec = np.linalg.norm(np.log(y_true_STFT) - np.log(y_pred_STFT))
+		return spec
+	def spectralConvergence(self, y_true, y_pred):
+		min_len = min(y_true.shape[0], y_pred.shape[0])
+		y_true_STFT = librosa.stft(y_true[:min_len], n_fft=self.hop_size, hop_length=int(self.hop_size/2))
+		y_pred_STFT = librosa.stft(y_pred[:min_len], n_fft=self.hop_size, hop_length=int(self.hop_size/2))
+		SC = np.linalg.norm(np.log(y_true_STFT + 1e-7) - np.log(y_pred_STFT + 1e-7), ord='fro') / np.linalg.norm(np.log(y_true_STFT + 1e-7), ord='fro')
+		return SC
+	def MFCC_MAE(self, y_true, y_pred, N_BANDS=13):
+		y_true_mfcc = librosa.feature.mfcc(y=y_true, sr=self.sample_rate, n_mfcc=N_BANDS, n_fft=self.hop_size, hop_length=int(self.hop_size/2))
+		y_pred_mfcc = librosa.feature.mfcc(y=y_pred, sr=self.sample_rate, n_mfcc=N_BANDS, n_fft=self.hop_size, hop_length=int(self.hop_size/2))
+		mfcc_mae = np.linalg.norm(y_true_mfcc - y_pred_mfcc)
+		return mfcc_mae
+	def parameters_MAE(self, prev_params, curr_params, weight=0.3):
+		# we assume that prev_params and curr_params are in [0,1]
+		return weight * np.linalg.norm(prev_params - curr_params)
+	def cosineDifferenceReward(self, target_state, agent_state):
+		cos_sim = cosine_similarity(agent_state.reshape(1,-1), target_state.reshape(1,-1))
+		return -(1-cos_sim[0][0])
+	def cosineDistanceReward(self, target_state, agent_state):
+		y = target_state[1:,:] - target_state[:-1,:]
+		y_hat = agent_state[1:,:] - agent_state[:-1,:]
+		cos_sim = cosine_similarity(y.reshape(1,-1), y_hat.reshape(1,-1))
+		return -(1-cos_sim[0][0])
+	# def SpectralOptimalTransport(self, y_true, y_pred):
+	# 	min_len = min(y_true.shape[0], y_pred.shape[0])
+	# 	y_true = torch.from_numpy(y_true[:min_len])
+	# 	y_pred = torch.from_numpy(y_pred[:min_len])
+	# 	sot_loss = Wasserstein1DLoss(transform='stft', fft_size=self.hop_size, hop_length=int(self.hop_size/2), 
+	# 						   		sample_rate=self.sr, window='flattop', square_magnitude=True)
+	# 	return sot_loss(y_true, y_pred)
 
 
 
@@ -635,7 +714,7 @@ if __name__ == "__main__":
 	# define environment
 	training_parameters = {}
 	training_parameters["environment"] = "synthgen-v0"
-	training_parameters["corpus_csv_path"] = "00_corpus/00_moisesdb/bass"
+	training_parameters["corpus_path"] = "corpus-target/00_corpus/moisesdb_guitar"
 	training_parameters["src_synth_type"] = "Theremin"
 	training_parameters["features"] = ['rms', 'cent']
 	training_parameters["sample_rate"] = 44100
@@ -653,6 +732,7 @@ if __name__ == "__main__":
 		training_parameters["environment"],
 		features=training_parameters["features"],
 		src_synth_type=training_parameters["src_synth_type"],
+		corpus_path = training_parameters["corpus_path"],
 		sample_rate = training_parameters["sample_rate"],
 		FFT_window_size = training_parameters["FFT_window_size"],
 		hop_size = training_parameters["hop_size"],
@@ -663,8 +743,8 @@ if __name__ == "__main__":
 		rewards = training_parameters["rewards"],
 		normalization_mode = training_parameters["normalization_mode"],
 		episode_mode = training_parameters["episode_mode"],
-		synths_info_dir='RL_continuous/corpus-domain/01_synthesizers',
-		save_folder='RL_continuous/corpus-domain/00_model_logs/prova_env',
+		synths_info_dir='./corpus-target/02_synthesizers',
+		save_folder='./corpus-target/01_model_logs/prova_env',
 		render_mode="human",
 	)
 	print(env.observation_space)

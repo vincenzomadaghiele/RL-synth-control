@@ -29,7 +29,7 @@ def evaluateRLmodel(log_dir, N_eval_episodes):
 		rewards = training_parameters["rewards"],
 		normalization_mode = training_parameters["normalization_mode"],
 		episode_mode = training_parameters["episode_mode"],
-		synths_info_dir='RL_continuous/corpus-domain/01_synthesizers',
+		synths_info_dir='corpus-target/02_synthesizers',
 		render_mode="human",
 		save_folder=log_dir
 	)
@@ -69,13 +69,13 @@ def evaluateRLmodel(log_dir, N_eval_episodes):
 
 if __name__ == "__main__":
 	
-	MODEL_NAME = '2026-02-12/1770891563-SAC'
-	log_dir = f'RL_continuous/corpus-domain/00_model_logs/{MODEL_NAME}'
+	MODEL_NAME = '2026-05-28/1779967918-SAC'
+	log_dir = f'corpus-target/01_model_logs/{MODEL_NAME}'
 	reward = evaluateRLmodel(log_dir, 10)
 	print(f'Evaluated model {MODEL_NAME} | Reward: {reward}')
 
 
-	log_dir = f'RL_continuous/corpus-domain/00_model_logs/{MODEL_NAME}/evaluation'
+	log_dir = f'corpus-target/01_model_logs/{MODEL_NAME}/evaluation'
 	dirs_list = [name for name in os.listdir(log_dir) if os.path.isdir(os.path.join(log_dir, name))]
 	mrSTFT_mean = 0
 	mrSTFT_std = 0
@@ -83,6 +83,16 @@ if __name__ == "__main__":
 	dMSE_std = 0
 	diffMSE_mean = 0
 	diffMSE_std = 0
+	specMAE_mean = 0
+	specMAE_std = 0
+	specConv_mean = 0
+	specConv_std = 0
+	mfccMAE_mean = 0
+	mfccMAE_std = 0
+	mfccMAE40_mean = 0
+	mfccMAE40_std = 0
+	# SOT_mean = 0
+	# SOT_std = 0
 	for dir in dirs_list:
 		with open(f'{log_dir}/{dir}/evaluation.json', 'r', encoding='utf-8') as file:
 			data = json.load(file)
@@ -92,12 +102,32 @@ if __name__ == "__main__":
 		dMSE_std += data['dMSE_std'] if str(data['dMSE_std']) != "nan" else 0 
 		diffMSE_mean += data['diffMSE_mean'] if str(data['diffMSE_mean']) != "nan" else 0 
 		diffMSE_std += data['diffMSE_std'] if str(data['diffMSE_std']) != "nan" else 0 
+		specMAE_mean += data['specMAE_mean'] if str(data['specMAE_mean']) != "nan" else 0 
+		specMAE_std += data['specMAE_std'] if str(data['specMAE_std']) != "nan" else 0 
+		specConv_mean += data['specConv_mean'] if str(data['specConv_mean']) != "nan" else 0 
+		specConv_std += data['specConv_std'] if str(data['specConv_std']) != "nan" else 0 
+		mfccMAE_mean += data['mfccMAE_mean'] if str(data['mfccMAE_mean']) != "nan" else 0 
+		mfccMAE_std += data['mfccMAE_std'] if str(data['mfccMAE_std']) != "nan" else 0 
+		mfccMAE40_mean += data['mfccMAE40_mean'] if str(data['mfccMAE40_mean']) != "nan" else 0 
+		mfccMAE40_std += data['mfccMAE40_std'] if str(data['mfccMAE40_std']) != "nan" else 0 
+		# SOT_mean += data['SOT_mean'] if str(data['SOT_mean']) != "nan" else 0 
+		# SOT_std += data['SOT_std'] if str(data['SOT_std']) != "nan" else 0 
 	mrSTFT_mean /= len(dir) - 1
 	mrSTFT_std /= len(dir) - 1
 	dMSE_mean /= len(dir) - 1
 	dMSE_std /= len(dir) - 1
 	diffMSE_mean /= len(dir) - 1
 	diffMSE_std /= len(dir) - 1
+	specMAE_mean /= len(dir) - 1
+	specMAE_std /= len(dir) - 1
+	specConv_mean /= len(dir) - 1
+	specConv_std /= len(dir) - 1
+	mfccMAE_mean /= len(dir) - 1
+	mfccMAE_std /= len(dir) - 1
+	mfccMAE40_mean /= len(dir) - 1
+	mfccMAE40_std /= len(dir) - 1
+	# SOT_mean /= len(dir) - 1
+	# SOT_std /= len(dir) - 1
 
 	tot_evaluation = {}
 	tot_evaluation['mrSTFT_mean'] = mrSTFT_mean
@@ -106,5 +136,15 @@ if __name__ == "__main__":
 	tot_evaluation['dMSE_std'] = dMSE_std
 	tot_evaluation['diffMSE_mean'] = diffMSE_mean
 	tot_evaluation['diffMSE_std'] = diffMSE_std
+	tot_evaluation['specMAE_mean'] = specMAE_mean
+	tot_evaluation['specMAE_std'] = specMAE_std
+	tot_evaluation['specConv_mean'] = specConv_mean
+	tot_evaluation['specConv_std'] = specConv_std
+	tot_evaluation['mfccMAE_mean'] = mfccMAE_mean
+	tot_evaluation['mfccMAE_std'] = mfccMAE_std
+	tot_evaluation['mfccMAE40_mean'] = mfccMAE40_mean
+	tot_evaluation['mfccMAE40_std'] = mfccMAE40_std
+	# tot_evaluation['SOT_mean'] = SOT_mean
+	# tot_evaluation['SOT_std'] = SOT_std
 	with open(f'{log_dir}/evaluation.json', 'w', encoding='utf-8') as f:
 		json.dump(tot_evaluation, f, ensure_ascii=False, indent=4)
