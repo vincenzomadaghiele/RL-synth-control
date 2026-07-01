@@ -69,7 +69,7 @@ def evaluateRLmodel(log_dir, N_eval_episodes):
 
 if __name__ == "__main__":
 	
-	MODEL_NAME = '2026-05-28/1779967918-SAC'
+	MODEL_NAME = '2026-06-26/1782463243-SAC'
 	log_dir = f'corpus-target/01_model_logs/{MODEL_NAME}'
 	reward = evaluateRLmodel(log_dir, 10)
 	print(f'Evaluated model {MODEL_NAME} | Reward: {reward}')

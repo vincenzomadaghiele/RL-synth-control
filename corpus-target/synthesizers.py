@@ -47,22 +47,22 @@ class Rungler(Patch):
         self.set_auto_free(False)
 
 class Benjolin(Patch):
-    def __init__(self, graph: AudioGraph, parameter_values: list = [0,0,0,0]):
+    def __init__(self, graph: AudioGraph, parameter_values: list = [0,0,0,0,0,0]):
         super().__init__()
 
         FRQ01 = self.add_input("parameter-0", parameter_values[0])
         FRQ02 = self.add_input("parameter-1", parameter_values[1])
         # RUN01 = self.add_input("parameter-2", parameter_values[2])
-        RUN02 = self.add_input("parameter-2", parameter_values[2])
-        FIL_FRQ = self.add_input("parameter-3", parameter_values[3])
+        RUN02 = self.add_input("parameter-3", parameter_values[2])
+        FIL_FRQ = self.add_input("parameter-4", parameter_values[3])
         # FIL_RES = self.add_input("parameter-5", parameter_values[5])
         # FIL_RUN = self.add_input("parameter-6", parameter_values[6])
-        # FIL_SWP = self.add_input("parameter-7", parameter_values[7])
-        # gain = self.add_input("parameter-8", parameter_values[8])
+        FIL_SWP = self.add_input("parameter-7", parameter_values[4])
+        gain = self.add_input("parameter-8", parameter_values[5])
 
         RUN01 = 0.1
         FIL_RES = 0.2
-        FIL_SWP = 0.3
+        # FIL_SWP = 0.3
         FIL_RUN = 0.5
 
         ## PARAMETERS
@@ -107,7 +107,7 @@ class Benjolin(Patch):
         output = filter_out * ScaleLinLin(input=FIL_RES, a=0, b=127, c=2, d=12)
         output = SVFilter(input=output, filter_type='high_pass', cutoff=10, resonance=0.0)
         output = Compressor(input=output, threshold=0.2, ratio=4, attack_time=0.01, release_time=0.1)
-        # output = output * gain
+        output = output * gain
 
         self.output = output
         self.set_auto_free(False)

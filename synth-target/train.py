@@ -25,7 +25,7 @@ if __name__ == "__main__":
 	training_parameters = {}
 	training_parameters["environment"] = "synthgen-v0"
 	training_parameters["src_synth_type"] = "Benjolin"
-	training_parameters["tgt_synth_type"] = "FM"
+	training_parameters["tgt_synth_type"] = "Granular"
 	training_parameters["features"] = ['rms', 'cent', 'flatness', 'rolloff']
 	training_parameters["sample_rate"] = 44100
 	training_parameters["FFT_window_size"] = 4096
@@ -46,7 +46,7 @@ if __name__ == "__main__":
 	# define model
 	AGENT_TYPE = training_parameters["AGENT_TYPE"]
 	agent_name = f'{int(time.time())}-{AGENT_TYPE}'
-	logdir = f'RL_continuous/in-domain/00_model_logs/{str(today)}/{agent_name}'
+	logdir = f'./synth-target/01_model_logs/{str(today)}/{agent_name}'
 	os.makedirs(logdir, exist_ok=True)
 	with open(f'{logdir}/training_config.json', 'w', encoding='utf-8') as f:
 		json.dump(training_parameters, f, ensure_ascii=False, indent=4)
@@ -66,7 +66,7 @@ if __name__ == "__main__":
 		rewards = training_parameters["rewards"],
 		normalization_mode = training_parameters["normalization_mode"],
 		episode_mode = training_parameters["episode_mode"],
-		synths_info_dir='RL_continuous/in-domain/01_synthesizers',
+		synths_info_dir='./synth-target/02_synthesizers',
 		save_folder=logdir,
 		train=True,
 		render_mode=None

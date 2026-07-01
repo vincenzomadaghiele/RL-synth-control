@@ -92,7 +92,7 @@ def computeFeatures(signal,
 											hop_length=hop_size)
 		for chroma_component in chroma.tolist():
 			features.append(np.array(chroma_component).reshape(1,-1))
-	features = np.concatenate(features, axis=0)
+	features = np.concatenate(features, axis=0) * rms
 	return features.T
 
 def compensateSignalLoudness(signal, FFT_window_size, hop_size):
@@ -116,8 +116,12 @@ def generateSynthEvenlySampledFeatures(synth,
 	elements = np.array(range(0, param_step_for_corpus_gen)) / param_step_for_corpus_gen
 	permutations = [p for p in itertools.product(elements, repeat=N_synth_parameters_src)]
 	synth_samples_features_src = []
-	for param_list in permutations:
+	pppp = []
+	# for param_list in permutations:
+	for param_list in range(2000):
+		param_list = list(np.random.rand(N_synth_parameters_src))
 		param_list = np.array(param_list).tolist()
+		pppp.append(param_list)
 		synth.resetParametersSRC(param_list)
 		window_array_src, _ = synth.forward()
 		features_values_src = computeFeatures(window_array_src, features,
@@ -129,15 +133,19 @@ def generateSynthEvenlySampledFeatures(synth,
 		synth_samples_features_src.append(features_values_src)
 	synth_feats_df_src = pd.DataFrame(data=np.array(synth_samples_features_src), columns=getFeatureNames(features, mfcc_N, chroma_N))
 	indixes = []
-	for p in permutations:
+	for p in pppp:
 		indixes.append('-'.join([str(pp) for pp in p]))
 	synth_feats_df_src['parameters'] = indixes
 	synth_feats_df_src = synth_feats_df_src.set_index('parameters')
 	# compute target
 	permutations = [p for p in itertools.product(elements, repeat=N_synth_parameters_tgt)]
 	synth_samples_features_tgt = []
-	for param_list in permutations:
+	# for param_list in permutations:
+	pppp = []
+	for param_list in range(2000):
+		param_list = list(np.random.rand(N_synth_parameters_src))
 		param_list = np.array(param_list).tolist()
+		pppp.append(param_list)
 		synth.resetParametersTGT(param_list)
 		_, window_array_tgt = synth.forward()
 		features_values_src = computeFeatures(window_array_tgt, features,
@@ -149,7 +157,7 @@ def generateSynthEvenlySampledFeatures(synth,
 		synth_samples_features_tgt.append(features_values_src)
 	synth_feats_df_tgt = pd.DataFrame(data=np.array(synth_samples_features_tgt), columns=getFeatureNames(features, mfcc_N, chroma_N))
 	indixes = []
-	for p in permutations:
+	for p in pppp:
 		indixes.append('-'.join([str(pp) for pp in p]))
 	synth_feats_df_tgt['parameters'] = indixes
 	synth_feats_df_tgt = synth_feats_df_tgt.set_index('parameters')
@@ -236,7 +244,7 @@ class SynthGenEnv(gym.Env):
 					os.makedirs(f'./{synths_info_dir}/{src_synth_type}')
 				synth_feats_df_src, _ = generateSynthEvenlySampledFeatures(self.synth, self.N_src_synth_parameters, 
 																			self.N_tgt_synth_parameters, self.allfeatures, 
-																			param_step_for_corpus_gen=10, sample_rate=self.sample_rate, 
+																			param_step_for_corpus_gen=3, sample_rate=self.sample_rate, 
 																			FFT_window_size=int(self.FFT_window_size/2), hop_size=int(self.hop_size/2), 
 																			mfcc_N=self.mfcc_N, chroma_N=self.chroma_N)
 				synth_feats_df_src.to_csv(f'{synths_info_dir}/{src_synth_type}/{src_synth_type}.csv')
@@ -303,7 +311,7 @@ class SynthGenEnv(gym.Env):
 		else:
 			# MOVE THESE TO JSON
 			if src_synth_type == 'Benjolin':
-				self.N_src_synth_parameters = 8
+				self.N_src_synth_parameters = 6
 			elif src_synth_type == 'Granular':
 				self.N_src_synth_parameters = 4
 			elif src_synth_type == 'FM':

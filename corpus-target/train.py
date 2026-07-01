@@ -24,9 +24,9 @@ if __name__ == "__main__":
 	# define environment
 	training_parameters = {}
 	training_parameters["environment"] = "synthgen-v0"
-	training_parameters["src_synth_type"] = "Benjolin"
-	training_parameters["corpus_path"] = './corpus-target/00_corpus/moisesdb_guitar'
-	training_parameters["features"] = ['rms','flatness','rolloff','cent']
+	training_parameters["src_synth_type"] = "FM"
+	training_parameters["corpus_path"] = './corpus-target/00_corpus/myvoice'
+	training_parameters["features"] = ['rms', 'cent', 'flatness', 'rolloff']
 	training_parameters["sample_rate"] = 44100
 	training_parameters["FFT_window_size"] = 4096
 	training_parameters["hop_size"] = 2048
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 	training_parameters["normalization_mode"] = 'shared'
 	training_parameters["episode_mode"] = 'static'
 	training_parameters["AGENT_TYPE"] = 'SAC'
-	training_parameters["iterations"] = 10
+	training_parameters["iterations"] = 100
 	training_parameters["timesteps"] = 1000
 	training_parameters["n_eval_episodes"] = 3
 	training_parameters["eval_interval"] = 5

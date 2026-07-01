@@ -92,7 +92,7 @@ def computeFeatures(signal,
 											hop_length=hop_size)
 		for chroma_component in chroma.tolist():
 			features.append(np.array(chroma_component).reshape(1,-1))
-	features = np.concatenate(features, axis=0)
+	features = np.concatenate(features, axis=0) * rms
 	return features.T
 
 def compensateSignalLoudness(signal, FFT_window_size, hop_size):
@@ -578,7 +578,7 @@ class SynthGenEnv(gym.Env):
 		info["previous_target_features"] = [float(f"{p:.2f}") for p in self.previous_tgt_features[-2,:].reshape(-1).tolist()]
 		info["reward"] = reward
 		if self.episode_step % 50 == 0:
-			print(f"Step {self.episode_step} | Reward {reward:.3f} | Action {info["action"]} | Parameters {info["src_synthesis_parameters"]} ")
+			# print(f"Step {self.episode_step} | Reward {reward:.3f} | Action {info["action"]} | Parameters {info["src_synthesis_parameters"]} ")
 			print(f'TGT feats {info["previous_target_features"]} | SRC feats {info["src_synth_features"]} | NEW TGT feats {info["tgt_synth_features"]}')
 		
 		# extract new target from corpus

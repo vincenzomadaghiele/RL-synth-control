@@ -56,9 +56,9 @@ if __name__ == "__main__":
 
     # corpus settings
     feature_names = getFeatureNames(features4training, mfcc_N, chroma_N)
-    corpus_path = './00_corpus/moisesdb_guitar'
+    corpus_path = './corpus-target/00_corpus/myvoice'
     model_name = f'seq_model_{int(time.time())}'
-    save_dir = f'./01_model_logs/seq_models/{corpus_path.split("/")[-1]}'
+    save_dir = f'./corpus-target/01_model_logs/seq_models/{corpus_path.split("/")[-1]}'
     os.makedirs(f'{save_dir}/{model_name}', exist_ok=True)
     os.makedirs(f'{save_dir}/tensorboard_logs/{model_name}', exist_ok=True)
 

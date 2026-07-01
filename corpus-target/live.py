@@ -13,43 +13,12 @@ from environment import SynthGenEnv, computeFeatures
 from synthesizers import *
 
 
-# def computeFeaturesCorpus(signal, features4training, sample_rate, FFT_window_size, hop_size):
-
-#     features = []
-#     mfcc_N = 13
-#     chroma_N = 12
-#     if 'rms' in features4training:
-#         rms = librosa.feature.rms(y=signal, frame_length=FFT_window_size, hop_length=hop_size)
-#         features.append(rms)
-#     if 'pitch' in features4training:
-#         pitch = librosa.yin(signal, fmin=100, fmax=22000, sr=sample_rate, frame_length=FFT_window_size, hop_length=hop_size)
-#         features.append(pitch.reshape(1,-1))
-#     if 'cent' in features4training:
-#         cent = librosa.feature.spectral_centroid(y=signal, sr=sample_rate, n_fft=FFT_window_size, hop_length=hop_size)
-#         features.append(cent)
-#     if 'flatness' in features4training:
-#         flatness = librosa.feature.spectral_flatness(y=signal, n_fft=FFT_window_size, hop_length=hop_size)
-#         features.append(flatness)
-#     if 'rolloff' in features4training:
-#         rolloff = librosa.feature.spectral_rolloff(y=signal, sr=sample_rate, n_fft=FFT_window_size, hop_length=hop_size)
-#         features.append(rolloff)
-#     if 'MFCC' in features4training:
-#         mfcc = librosa.feature.mfcc(y=signal, sr=sample_rate, n_mfcc=mfcc_N, n_fft=FFT_window_size, hop_length=hop_size)
-#         for mfcc_component in mfcc.tolist():
-#             features.append(np.array(mfcc_component).reshape(1,-1))
-#     if 'chroma' in features4training:
-#         chroma = librosa.feature.chroma_stft(y=signal, sr=sample_rate, n_chroma=chroma_N, n_fft=FFT_window_size, hop_length=hop_size)
-#         for chroma_component in chroma.tolist():
-#             features.append(np.array(chroma_component).reshape(1,-1))
-#     features = np.concatenate(features, axis=0)
-#     return features
-
 
 if __name__ == "__main__":
 
 	# load model
-	MODEL_NAME = '2026-04-23/1776934426-SAC'
-	log_dir = f'corpus-target/01_model_logs/{MODEL_NAME}'
+	MODEL_NAME = '2026-06-23/1782219887-SAC'
+	log_dir = f'./corpus-target/01_model_logs/{MODEL_NAME}'
 
 	with open(f'{log_dir}/training_config.json', 'r') as f:
 		training_parameters = json.load(f)
@@ -62,15 +31,15 @@ if __name__ == "__main__":
 	config.sample_rate = sr
 	config.output_buffer_size = 256
 	# config.output_device_name = "UltraLite-mk5"
-	config.output_device_name = "BlackHole 16ch"
-	config.input_device_name = "UltraLite-mk5"
+	config.input_device_name = "Scarlett 2i2 USB" 
+	config.output_device_name = "Scarlett 2i2 USB"
 	graph = AudioGraph(config)
 	# graph.poll(2)
 	audio_in = AudioIn() * 1
 	# right_output = StereoPanner(audio_in, 1)
 
 	if training_parameters["src_synth_type"] == 'Benjolin':
-		synth = Benjolin()
+		synth = Benjolin(graph)
 	elif training_parameters["src_synth_type"] == 'FM':
 		synth = FM()
 	elif training_parameters["src_synth_type"] == 'Granular':
@@ -97,12 +66,11 @@ if __name__ == "__main__":
 	synth_scaler = joblib.load(f'{log_dir}/src_synth_scaler.pkl')
 
 	# create env
-	# define environment
 	env = gym.make(
 		training_parameters["environment"],
 		features=training_parameters["features"],
 		src_synth_type=training_parameters["src_synth_type"],
-		corpus_path = training_parameters["corpus_path"],
+		corpus_path=training_parameters["corpus_path"],
 		sample_rate = training_parameters["sample_rate"],
 		FFT_window_size = training_parameters["FFT_window_size"],
 		hop_size = training_parameters["hop_size"],
@@ -113,12 +81,14 @@ if __name__ == "__main__":
 		rewards = training_parameters["rewards"],
 		normalization_mode = training_parameters["normalization_mode"],
 		episode_mode = training_parameters["episode_mode"],
-		synths_info_dir='RL_continuous/corpus-domain/01_synthesizers',
+		synths_info_dir='./corpus-target/02_synthesizers',
 		save_folder=log_dir,
 		train=False,
 		render_mode=None
 	)
 	print(env.observation_space)
+
+
 
 	# load model
 	AGENT_TYPE = training_parameters["AGENT_TYPE"]
@@ -136,7 +106,7 @@ if __name__ == "__main__":
 	synth_buffer = Buffer(1, window_size*3)
 	input_buffer = Buffer(1, window_size*3)
 
-	# add delay lines for responses (how to compensate for latency?)
+	# add delay lines for responses
 	min_feedback_writer_delay = graph.output_buffer_size / graph.sample_rate # samples
 	graph.add_node(FeedbackBufferWriter(synth_buffer, synth, min_feedback_writer_delay))
 	graph.add_node(FeedbackBufferWriter(input_buffer, audio_in, min_feedback_writer_delay))
@@ -155,7 +125,7 @@ if __name__ == "__main__":
 	time.sleep(update_interval_s)
 
 	# graph.play([audio_in, synth]) 
-	graph.play([0,0,audio_in]) 
+	# graph.play([0,0,audio_in]) 
 	# audio_in.play()
 	# graph.play(StereoPanner(audio_in, 1)) 
 	# StereoPanner(synth, -1).play()

@@ -70,12 +70,12 @@ def evaluateRLmodel(log_dir, N_eval_episodes):
 
 if __name__ == "__main__":
 	
-	MODEL_NAME = '2026-02-09/1770660434-SAC'
-	log_dir = f'RL_continuous/in-domain/00_model_logs/{MODEL_NAME}'
+	MODEL_NAME = '2026-06-26/1782455306-SAC'
+	log_dir = f'./synth-target/01_model_logs/{MODEL_NAME}'
 	reward = evaluateRLmodel(log_dir, 10)
 	print(f'Evaluated model {MODEL_NAME} | Reward: {reward}')
 
-	log_dir = f'RL_continuous/in-domain/00_model_logs/{MODEL_NAME}/evaluation'
+	log_dir = f'./synth-target/01_model_logs/{MODEL_NAME}/evaluation'
 	dirs_list = [name for name in os.listdir(log_dir) if os.path.isdir(os.path.join(log_dir, name))]
 	mrSTFT_mean = 0
 	mrSTFT_std = 0
